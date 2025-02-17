@@ -1,5 +1,5 @@
 import React from "react";
-import {
+import type {
   AppClassProperties,
   AppProps,
   AppState,
@@ -7,11 +7,11 @@ import {
   ExcalidrawProps,
   UIAppState,
 } from "../types";
-import { ActionManager } from "../actions/manager";
+import type { ActionManager } from "../actions/manager";
 import { t } from "../i18n";
 import Stack from "./Stack";
 import { showSelectedShapeActions } from "../element";
-import { NonDeletedExcalidrawElement } from "../element/types";
+import type { NonDeletedExcalidrawElement } from "../element/types";
 import { FixedSideContainer } from "./FixedSideContainer";
 import { Island } from "./Island";
 import { HintViewer } from "./HintViewer";
@@ -21,8 +21,6 @@ import { Section } from "./Section";
 import { SCROLLBAR_WIDTH, SCROLLBAR_MARGIN } from "../scene/scrollbars";
 import { LockButton } from "./LockButton";
 import { PenModeButton } from "./PenModeButton";
-import { Stats } from "./Stats";
-import { actionToggleStats } from "../actions";
 import { HandButton } from "./HandButton";
 import { isHandToolActive } from "../appState";
 import { useTunnels } from "../context/tunnels";
@@ -93,9 +91,10 @@ export const MobileMenu = ({
                 </Island>
                 {renderTopRightUI && renderTopRightUI(true, appState)}
                 <div className="mobile-misc-tools-container">
-                  {!appState.viewModeEnabled && (
-                    <DefaultSidebarTriggerTunnel.Out />
-                  )}
+                  {!appState.viewModeEnabled &&
+                    appState.openDialog?.name !== "elementLinkSelector" && (
+                      <DefaultSidebarTriggerTunnel.Out />
+                    )}
                   <PenModeButton
                     checked={appState.penMode}
                     onChange={() => onPenModeToggle(null)}
@@ -131,7 +130,10 @@ export const MobileMenu = ({
   };
 
   const renderAppToolbar = () => {
-    if (appState.viewModeEnabled) {
+    if (
+      appState.viewModeEnabled ||
+      appState.openDialog?.name === "elementLinkSelector"
+    ) {
       return (
         <div className="App-toolbar-content">
           <MainMenuTunnel.Out />
@@ -143,12 +145,14 @@ export const MobileMenu = ({
       <div className="App-toolbar-content">
         <MainMenuTunnel.Out />
         {actionManager.renderAction("toggleEditMenu")}
-        {actionManager.renderAction("undo")}
-        {actionManager.renderAction("redo")}
         {actionManager.renderAction(
           appState.multiElement ? "finalize" : "duplicateSelection",
         )}
         {actionManager.renderAction("deleteSelectedElements")}
+        <div>
+          {actionManager.renderAction("undo")}
+          {actionManager.renderAction("redo")}
+        </div>
       </div>
     );
   };
@@ -156,18 +160,9 @@ export const MobileMenu = ({
   return (
     <>
       {renderSidebars()}
-      {!appState.viewModeEnabled && renderToolbar()}
-      {!appState.openMenu && appState.showStats && (
-        <Stats
-          appState={appState}
-          setAppState={setAppState}
-          elements={elements}
-          onClose={() => {
-            actionManager.executeAction(actionToggleStats);
-          }}
-          renderCustomStats={renderCustomStats}
-        />
-      )}
+      {!appState.viewModeEnabled &&
+        appState.openDialog?.name !== "elementLinkSelector" &&
+        renderToolbar()}
       <div
         className="App-bottom-bar"
         style={{
@@ -179,12 +174,14 @@ export const MobileMenu = ({
         <Island padding={0}>
           {appState.openMenu === "shape" &&
           !appState.viewModeEnabled &&
+          appState.openDialog?.name !== "elementLinkSelector" &&
           showSelectedShapeActions(appState, elements) ? (
             <Section className="App-mobile-menu" heading="selectedShapeActions">
               <SelectedShapeActions
                 appState={appState}
                 elementsMap={app.scene.getNonDeletedElementsMap()}
                 renderAction={actionManager.renderAction}
+                app={app}
               />
             </Section>
           ) : null}
@@ -194,6 +191,7 @@ export const MobileMenu = ({
               !appState.openMenu &&
               !appState.openSidebar && (
                 <button
+                  type="button"
                   className="scroll-back-to-content"
                   onClick={() => {
                     setAppState((appState) => ({

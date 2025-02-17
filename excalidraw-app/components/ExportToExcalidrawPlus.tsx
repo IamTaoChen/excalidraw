@@ -3,11 +3,11 @@ import { Card } from "../../packages/excalidraw/components/Card";
 import { ToolButton } from "../../packages/excalidraw/components/ToolButton";
 import { serializeAsJSON } from "../../packages/excalidraw/data/json";
 import { loadFirebaseStorage, saveFilesToFirebase } from "../data/firebase";
-import {
+import type {
   FileId,
   NonDeletedExcalidrawElement,
 } from "../../packages/excalidraw/element/types";
-import {
+import type {
   AppState,
   BinaryFileData,
   BinaryFiles,
@@ -25,6 +25,7 @@ import { MIME_TYPES } from "../../packages/excalidraw/constants";
 import { trackEvent } from "../../packages/excalidraw/analytics";
 import { getFrame } from "../../packages/excalidraw/utils";
 import { ExcalidrawLogo } from "../../packages/excalidraw/components/ExcalidrawLogo";
+import { uploadBytes, ref } from "firebase/storage";
 
 export const exportToExcalidrawPlus = async (
   elements: readonly NonDeletedExcalidrawElement[],
@@ -32,7 +33,7 @@ export const exportToExcalidrawPlus = async (
   files: BinaryFiles,
   name: string,
 ) => {
-  const firebase = await loadFirebaseStorage();
+  const storage = await loadFirebaseStorage();
 
   const id = `${nanoid(12)}`;
 
@@ -49,15 +50,13 @@ export const exportToExcalidrawPlus = async (
     },
   );
 
-  await firebase
-    .storage()
-    .ref(`/migrations/scenes/${id}`)
-    .put(blob, {
-      customMetadata: {
-        data: JSON.stringify({ version: 2, name }),
-        created: Date.now().toString(),
-      },
-    });
+  const storageRef = ref(storage, `/migrations/scenes/${id}`);
+  await uploadBytes(storageRef, blob, {
+    customMetadata: {
+      data: JSON.stringify({ version: 2, name }),
+      created: Date.now().toString(),
+    },
+  });
 
   const filesMap = new Map<FileId, BinaryFileData>();
   for (const element of elements) {

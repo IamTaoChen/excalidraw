@@ -1,4 +1,4 @@
-import {
+import type {
   GroupId,
   ExcalidrawElement,
   NonDeleted,
@@ -6,7 +6,7 @@ import {
   ElementsMapOrArray,
   ElementsMap,
 } from "./element/types";
-import {
+import type {
   AppClassProperties,
   AppState,
   InteractiveCanvasAppState,
@@ -14,7 +14,7 @@ import {
 import { getSelectedElements } from "./scene";
 import { getBoundTextElement } from "./element/textElement";
 import { makeNextSelectedElementIds } from "./scene/selection";
-import { Mutable } from "./utility-types";
+import type { Mutable } from "./utility-types";
 
 export const selectGroup = (
   groupId: GroupId,
@@ -105,6 +105,10 @@ export const selectGroupsForSelectedElements = (function () {
     const groupElementsIndex: Record<GroupId, string[]> = {};
     const selectedElementIdsInGroups = elements.reduce(
       (acc: Record<string, true>, element) => {
+        if (element.isDeleted) {
+          return acc;
+        }
+
         const groupId = element.groupIds.find((id) => selectedGroupIds[id]);
 
         if (groupId) {
@@ -355,7 +359,27 @@ export const getMaximumGroups = (
   return Array.from(groups.values());
 };
 
-export const elementsAreInSameGroup = (elements: ExcalidrawElement[]) => {
+export const getNonDeletedGroupIds = (elements: ElementsMap) => {
+  const nonDeletedGroupIds = new Set<string>();
+
+  for (const [, element] of elements) {
+    // defensive check
+    if (element.isDeleted) {
+      continue;
+    }
+
+    // defensive fallback
+    for (const groupId of element.groupIds ?? []) {
+      nonDeletedGroupIds.add(groupId);
+    }
+  }
+
+  return nonDeletedGroupIds;
+};
+
+export const elementsAreInSameGroup = (
+  elements: readonly ExcalidrawElement[],
+) => {
   const allGroups = elements.flatMap((element) => element.groupIds);
   const groupCount = new Map<string, number>();
   let maxGroup = 0;
@@ -368,4 +392,8 @@ export const elementsAreInSameGroup = (elements: ExcalidrawElement[]) => {
   }
 
   return maxGroup === elements.length;
+};
+
+export const isInGroup = (element: NonDeletedExcalidrawElement) => {
+  return element.groupIds.length > 0;
 };

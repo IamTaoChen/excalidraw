@@ -1,16 +1,26 @@
-import {
+import type {
   ElementsMap,
   ExcalidrawElement,
   NonDeletedExcalidrawElement,
   PointerType,
 } from "./types";
 
-import { Bounds, getElementAbsoluteCoords } from "./bounds";
-import { rotate } from "../math";
-import { InteractiveCanvasAppState, Zoom } from "../types";
-import { isTextElement } from ".";
-import { isFrameLikeElement, isLinearElement } from "./typeChecks";
-import { DEFAULT_TRANSFORM_HANDLE_SPACING } from "../constants";
+import type { Bounds } from "./bounds";
+import { getElementAbsoluteCoords } from "./bounds";
+import type { Device, InteractiveCanvasAppState, Zoom } from "../types";
+import {
+  isElbowArrow,
+  isFrameLikeElement,
+  isImageElement,
+  isLinearElement,
+} from "./typeChecks";
+import {
+  DEFAULT_TRANSFORM_HANDLE_SPACING,
+  isAndroid,
+  isIOS,
+} from "../constants";
+import type { Radians } from "../../math";
+import { pointFrom, pointRotateRads } from "../../math";
 
 export type TransformHandleDirection =
   | "n"
@@ -38,6 +48,13 @@ const transformHandleSizes: { [k in PointerType]: number } = {
 
 const ROTATION_RESIZE_HANDLE_GAP = 16;
 
+export const DEFAULT_OMIT_SIDES = {
+  e: true,
+  s: true,
+  n: true,
+  w: true,
+};
+
 export const OMIT_SIDES_FOR_MULTIPLE_ELEMENTS = {
   e: true,
   s: true,
@@ -51,13 +68,6 @@ export const OMIT_SIDES_FOR_FRAME = {
   n: true,
   w: true,
   rotation: true,
-};
-
-const OMIT_SIDES_FOR_TEXT_ELEMENT = {
-  e: true,
-  s: true,
-  n: true,
-  w: true,
 };
 
 const OMIT_SIDES_FOR_LINE_SLASH = {
@@ -83,19 +93,44 @@ const generateTransformHandle = (
   height: number,
   cx: number,
   cy: number,
-  angle: number,
+  angle: Radians,
 ): TransformHandle => {
-  const [xx, yy] = rotate(x + width / 2, y + height / 2, cx, cy, angle);
+  const [xx, yy] = pointRotateRads(
+    pointFrom(x + width / 2, y + height / 2),
+    pointFrom(cx, cy),
+    angle,
+  );
   return [xx - width / 2, yy - height / 2, width, height];
+};
+
+export const canResizeFromSides = (device: Device) => {
+  if (device.viewport.isMobile) {
+    return false;
+  }
+
+  if (device.isTouchScreen && (isAndroid || isIOS)) {
+    return false;
+  }
+
+  return true;
+};
+
+export const getOmitSidesForDevice = (device: Device) => {
+  if (canResizeFromSides(device)) {
+    return DEFAULT_OMIT_SIDES;
+  }
+
+  return {};
 };
 
 export const getTransformHandlesFromCoords = (
   [x1, y1, x2, y2, cx, cy]: [number, number, number, number, number, number],
-  angle: number,
+  angle: Radians,
   zoom: Zoom,
   pointerType: PointerType,
   omitSides: { [T in TransformHandleType]?: boolean } = {},
   margin = 4,
+  spacing = DEFAULT_TRANSFORM_HANDLE_SPACING,
 ): TransformHandles => {
   const size = transformHandleSizes[pointerType];
   const handleWidth = size / zoom.value;
@@ -107,8 +142,7 @@ export const getTransformHandlesFromCoords = (
   const width = x2 - x1;
   const height = y2 - y1;
   const dashedLineMargin = margin / zoom.value;
-  const centeringOffset =
-    (size - DEFAULT_TRANSFORM_HANDLE_SPACING * 2) / (2 * zoom.value);
+  const centeringOffset = (size - spacing * 2) / (2 * zoom.value);
 
   const transformHandles: TransformHandles = {
     nw: omitSides.nw
@@ -232,17 +266,20 @@ export const getTransformHandles = (
   element: ExcalidrawElement,
   zoom: Zoom,
   elementsMap: ElementsMap,
-
   pointerType: PointerType = "mouse",
+  omitSides: { [T in TransformHandleType]?: boolean } = DEFAULT_OMIT_SIDES,
 ): TransformHandles => {
   // so that when locked element is selected (especially when you toggle lock
   // via keyboard) the locked element is visually distinct, indicating
   // you can't move/resize
-  if (element.locked) {
+  if (
+    element.locked ||
+    // Elbow arrows cannot be rotated
+    isElbowArrow(element)
+  ) {
     return {};
   }
 
-  let omitSides: { [T in TransformHandleType]?: boolean } = {};
   if (element.type === "freedraw" || isLinearElement(element)) {
     if (element.points.length === 2) {
       // only check the last point because starting point is always (0,0)
@@ -259,15 +296,16 @@ export const getTransformHandles = (
         omitSides = OMIT_SIDES_FOR_LINE_BACKSLASH;
       }
     }
-  } else if (isTextElement(element)) {
-    omitSides = OMIT_SIDES_FOR_TEXT_ELEMENT;
   } else if (isFrameLikeElement(element)) {
     omitSides = {
+      ...omitSides,
       rotation: true,
     };
   }
-  const dashedLineMargin = isLinearElement(element)
+  const margin = isLinearElement(element)
     ? DEFAULT_TRANSFORM_HANDLE_SPACING + 8
+    : isImageElement(element)
+    ? 0
     : DEFAULT_TRANSFORM_HANDLE_SPACING;
   return getTransformHandlesFromCoords(
     getElementAbsoluteCoords(element, elementsMap, true),
@@ -275,7 +313,8 @@ export const getTransformHandles = (
     zoom,
     pointerType,
     omitSides,
-    dashedLineMargin,
+    margin,
+    isImageElement(element) ? 0 : undefined,
   );
 };
 
@@ -290,6 +329,10 @@ export const shouldShowBoundingBox = (
     return true;
   }
   const element = elements[0];
+  if (isElbowArrow(element)) {
+    // Elbow arrows cannot be resized as single selected elements
+    return false;
+  }
   if (!isLinearElement(element)) {
     return true;
   }

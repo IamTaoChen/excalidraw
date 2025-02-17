@@ -1,7 +1,6 @@
 import clsx from "clsx";
 import React, { useEffect, useState } from "react";
 import { useCallbackRefState } from "../hooks/useCallbackRefState";
-import { t } from "../i18n";
 import {
   useExcalidrawContainer,
   useDevice,
@@ -9,13 +8,13 @@ import {
 } from "./App";
 import { KEYS } from "../keys";
 import "./Dialog.scss";
-import { back, CloseIcon } from "./icons";
 import { Island } from "./Island";
 import { Modal } from "./Modal";
 import { queryFocusableElements } from "../utils";
-import { useSetAtom } from "jotai";
 import { isLibraryMenuOpenAtom } from "./LibraryMenu";
-import { jotaiScope } from "../jotai";
+import { useSetAtom } from "../editor-jotai";
+import { t } from "../i18n";
+import { CloseIcon } from "./icons";
 
 export type DialogSize = number | "small" | "regular" | "wide" | undefined;
 
@@ -58,10 +57,12 @@ export const Dialog = (props: DialogProps) => {
 
     const focusableElements = queryFocusableElements(islandNode);
 
-    if (focusableElements.length > 0 && props.autofocus !== false) {
-      // If there's an element other than close, focus it.
-      (focusableElements[1] || focusableElements[0]).focus();
-    }
+    setTimeout(() => {
+      if (focusableElements.length > 0 && props.autofocus !== false) {
+        // If there's an element other than close, focus it.
+        (focusableElements[1] || focusableElements[0]).focus();
+      }
+    });
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === KEYS.TAB) {
@@ -90,7 +91,7 @@ export const Dialog = (props: DialogProps) => {
   }, [islandNode, props.autofocus]);
 
   const setAppState = useExcalidrawSetAppState();
-  const setIsLibraryMenuOpen = useSetAtom(isLibraryMenuOpenAtom, jotaiScope);
+  const setIsLibraryMenuOpen = useSetAtom(isLibraryMenuOpenAtom);
 
   const onClose = () => {
     setAppState({ openMenu: null });
@@ -115,14 +116,17 @@ export const Dialog = (props: DialogProps) => {
             <span className="Dialog__titleContent">{props.title}</span>
           </h2>
         )}
-        <button
-          className="Dialog__close"
-          onClick={onClose}
-          title={t("buttons.close")}
-          aria-label={t("buttons.close")}
-        >
-          {isFullscreen ? back : CloseIcon}
-        </button>
+        {isFullscreen && (
+          <button
+            className="Dialog__close"
+            onClick={onClose}
+            title={t("buttons.close")}
+            aria-label={t("buttons.close")}
+            type="button"
+          >
+            {CloseIcon}
+          </button>
+        )}
         <div className="Dialog__content">{props.children}</div>
       </Island>
     </Modal>

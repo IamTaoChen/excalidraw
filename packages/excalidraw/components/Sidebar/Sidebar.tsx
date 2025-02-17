@@ -8,13 +8,9 @@ import React, {
   useCallback,
 } from "react";
 import { Island } from "../Island";
-import { atom, useSetAtom } from "jotai";
-import { jotaiScope } from "../../jotai";
-import {
-  SidebarPropsContext,
-  SidebarProps,
-  SidebarPropsContextValue,
-} from "./common";
+import { atom, useSetAtom } from "../../editor-jotai";
+import type { SidebarProps, SidebarPropsContextValue } from "./common";
+import { SidebarPropsContext } from "./common";
 import { SidebarHeader } from "./SidebarHeader";
 import clsx from "clsx";
 import { useDevice, useExcalidrawSetAppState } from "../App";
@@ -61,7 +57,7 @@ export const SidebarInner = forwardRef(
 
     const setAppState = useExcalidrawSetAppState();
 
-    const setIsSidebarDockedAtom = useSetAtom(isSidebarDockedAtom, jotaiScope);
+    const setIsSidebarDockedAtom = useSetAtom(isSidebarDockedAtom);
 
     useLayoutEffect(() => {
       setIsSidebarDockedAtom(!!docked);
