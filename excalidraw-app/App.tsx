@@ -79,7 +79,11 @@ import {
 import { updateStaleImageStatuses } from "./data/FileManager";
 import { newElementWith } from "../packages/excalidraw/element/mutateElement";
 import { isInitializedImageElement } from "../packages/excalidraw/element/typeChecks";
-import { loadFilesFromFirebase } from "./data/firebase";
+// import { loadFilesFromFirebase } from "./data/firebase";
+import {
+  getStorageBackendB,
+  storageBackend,
+} from "./data/config";
 import {
   LibraryIndexedDBAdapter,
   LibraryLocalStorageMigrationAdapter,
@@ -360,7 +364,9 @@ const ExcalidrawWrapper = () => {
           }, [] as FileId[]) || [];
 
         if (data.isExternalScene) {
-          loadFilesFromFirebase(
+          // loadFilesFromFirebase(
+          const storageBackend = getStorageBackendB();
+          storageBackend.loadFilesFromStorageBackend(
             `${FIREBASE_STORAGE_PREFIXES.shareLinkFiles}/${data.id}`,
             data.key,
             fileIds,
